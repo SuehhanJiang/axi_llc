@@ -63,6 +63,7 @@ module axi_llc_tag_store #(
   // typedef, because we use in this module many signals with the width of SetAssiciativity
   typedef logic [Cfg.IndexLength-1:0] index_t; // index type (equals the address for sram)
   typedef logic [Cfg.TagLength-1:0]   tag_t;
+  
 
   // typedef to have consistent tag data (that what gets written into the sram)
   localparam int unsigned TagDataLen = Cfg.TagLength + 32'd2;
@@ -93,29 +94,36 @@ module axi_llc_tag_store #(
   // Write enable for the macros, active high. (Also functions as byte enable as there is one byte).
   way_ind_t   ram_we;
   // Index is the address.
-  index_t     ram_index;
+  index_t     ram_index, ram_index_inp;
   // Write data for the macros.
   tag_data_t  ram_wdata;
   // Read data is valid
   way_ind_t   ram_rvalid,  ram_rvalid_q, ram_rvalid_d;
   logic       lock_rvalid;
   // Hit indication signals
-  way_ind_t   hit, tag_val, tag_dit,     tag_equ;
+  way_ind_t   hit, hit_inp, tag_val, tag_dit,     tag_equ;
   tag_data_t  [Cfg.SetAssociativity-1:0] stored_tag;
   // Binary representation of the selected output indicator
   bin_ind_t   bin_ind;
   // The pattern generation unit signals
-  logic       gen_valid,   gen_ready;
+  logic       gen_valid,   gen_ready, plru_gen_ready;
   index_t     gen_index;
   tag_data_t  gen_pattern, bist_pattern;
   logic       gen_req,     gen_we;
   way_ind_t   bist_res;
-  logic       bist_valid,  gen_eoc;
+  logic       bist_valid,  gen_eoc, plru_gen_eoc;
   // Evict box signals
   logic       evict_req,   evict_valid;
+  // PLRU Module Hit/BIST Detection Signals
+  logic       hit_req, hit_valid_s, bist_req;
   // Response output into the spill register
   store_res_t res;
   logic       res_valid,   res_ready;
+  
+  // BIST OUTPUT SIGNALS (Currently not connected to hardware)
+  way_ind_t plru_bist_res_o;
+  logic       plru_bist_valid_o;
+
 
   // macro control
   always_comb begin : proc_macro_ctrl
@@ -129,13 +137,21 @@ module axi_llc_tag_store #(
     ram_we       = way_ind_t'(0);
     ram_index    = way_ind_t'(0);
     ram_wdata    = tag_data_t'{default: '0};
-    // Evict box
+    // PLRU Module Evict/Miss Request
     evict_req    = 1'b0;
+    // PLRU Module Hit Request
+    hit_req	 = 1'b0;
+    // PLRU Hit_inp/Ram_index_inp Initialization
+    hit_inp     = way_ind_t'(0);
+    ram_index_inp = index_t'(0);
+    // PLRU Module Bist Req Initialization
+    bist_req    = 1'b0;
     // generation request
     gen_valid    = 1'b0;
     bist_valid   = 1'b0;
 
     if (busy_q) begin
+      
       // We are busy so there are active operations going on, we are not ready.
       unique case (req_q.mode)
           axi_llc_pkg::Bist: begin
@@ -145,8 +161,11 @@ module axi_llc_tag_store #(
             ram_index  = gen_index;
             ram_wdata  = gen_pattern;
             bist_valid = |ram_rvalid;
+            
+            // To Indicate Bist request to the PLRU Unit
+            bist_req   = 1;
             // If BIST finished, go to idle.
-            if (gen_eoc) begin
+            if (gen_eoc && plru_gen_eoc) begin
               switch_busy = 1'b1;
             end
           end
@@ -155,9 +174,14 @@ module axi_llc_tag_store #(
             if ((|ram_rvalid) | (|ram_rvalid_q)) begin
               // We are valid on hit.
               if (|hit) begin
-                res_valid = 1'b1;
+              	hit_req = 1'b1;
+              	ram_index_inp = req_q.index;
+              	hit_inp = hit;
+                res_valid = hit_valid_s;
               end else begin
                 evict_req = 1'b1;
+                ram_index_inp = req_q.index;
+                hit_inp = hit;
                 res_valid = evict_valid;
               end
             end
@@ -226,7 +250,6 @@ module axi_llc_tag_store #(
     end else begin
       // we are not busy, so we are ready to get a new request.
       ready_o = 1'b1;
-
       if (valid_i) begin
         // There is a request to the tag store.
         switch_busy = 1'b1;
@@ -236,9 +259,9 @@ module axi_llc_tag_store #(
         unique case (req_i.mode)
           axi_llc_pkg::Bist: begin
             gen_valid   = 1'b1;
-            ready_o     = gen_ready;
+            ready_o     = gen_ready & plru_gen_ready;
             // Only switch the state, if the request is valid
-            switch_busy = gen_ready;
+            switch_busy = gen_ready & plru_gen_ready;
           end
           axi_llc_pkg::Lookup, axi_llc_pkg::Flush: begin
             // Do the lookup on the requested macros
@@ -252,8 +275,9 @@ module axi_llc_tag_store #(
       end
     end
   end
-
-  `FFLARN(req_q, req_i, load_req, store_req_t'{default: '0}, clk_i, rst_ni)
+  
+  
+  `FFLARN(req_q, req_i, load_req, store_req_t'{mode: axi_llc_pkg::tag_mode_e'(00), default: '0}, clk_i, rst_ni)
   `FFLARN(busy_q, busy_d, switch_busy, 1'b0, clk_i, rst_ni)
   assign busy_d = ~busy_q;
   `FFLARN(ram_rvalid_q, ram_rvalid_d, lock_rvalid, way_ind_t'(0), clk_i, rst_ni)
@@ -306,7 +330,7 @@ module axi_llc_tag_store #(
     assign tag_dit[i] = ram_rdata.dit;     // indicates which tags are dirty
 
     // hit detection
-    assign hit[i]        = req_q.indicator[i] & tag_val[i] & tag_equ[i];
+    assign hit[i]        = req_q.indicator[i] & tag_val[i] & tag_equ[i]; //Here the req_q.indicator just determines the non flushed ways which have valid tags in them. It is determined in the line 248 in hit_miss unit. This flushed bit is determined in the config module as flushed_o (rad it)
     // BIST also add the two bits of valid and dirty
     assign bist_res[i]   = ram_compared.val & ram_compared.dit & tag_equ[i];
     // assignment to wide output signal that goes to the tag output mux
@@ -354,14 +378,28 @@ module axi_llc_tag_store #(
   ) i_evict_box (
     .clk_i,
     .rst_ni,
-    .req_i       ( evict_req     ),
-    .tag_valid_i ( tag_val       ),
-    .tag_dirty_i ( tag_dit       ),
-    .spm_lock_i  ( spm_lock_i    ),
-    .way_ind_o   ( evict_way_ind ),
-    .evict_o     ( evict_flag    ),
-    .valid_o     ( evict_valid   )
+    .evict_i        ( evict_req     ),
+    .hit_i	     ( hit_req	      ),
+    .bist_i         ( bist_req      ),
+    .res_indicator  ( hit_inp       ),
+    .tag_valid_i    ( tag_val       ),
+    .tag_dirty_i    ( tag_dit       ),
+    .spm_lock_i     ( spm_lock_i    ),
+    .ram_index      ( ram_index_inp ),
+    .way_ind_o      ( evict_way_ind ),
+    .evict_o        ( evict_flag    ),
+    .valid_o        ( evict_valid   ),
+    .valid_o_plru   ( hit_valid_s   ),
+    
+    // pins for BIST
+    .plru_gen_valid ( gen_valid     ),
+    .plru_gen_ready ( plru_gen_ready),
+    .plru_bist_res_o ( plru_bist_res_o),
+    .plru_gen_eoc    ( plru_gen_eoc)
   );
+  
+  // Assign plru_bist_valid_o signal for Memory BIST Checking (PLRU ARRAY) 
+  //assign plru_bist_valid_o = (req_q.mode == axi_llc_pkg::BIST) & plru_gen_eoc;
 
   onehot_to_bin #(
     .ONEHOT_WIDTH ( Cfg.SetAssociativity )
@@ -414,6 +452,7 @@ module axi_llc_tag_store #(
     .data_o  ( res_o     )
   );
 
+  			
   // Assertions
   // pragma translate_off
   `ifndef VERILATOR

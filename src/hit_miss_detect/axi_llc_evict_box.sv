@@ -13,89 +13,114 @@ module axi_llc_evict_box #(
   /// Static configuration parameters of the LLC.
   parameter axi_llc_pkg::llc_cfg_t Cfg = axi_llc_pkg::llc_cfg_t'{default: '0},
   /// Way indicator type. This segnal has the width equal to the set-associativity.
-  parameter type way_ind_t = logic
+  parameter type way_ind_t = logic,
+  /// Store res type. Signal is used to determine the hit, way_ind from tag_store unit
+  parameter type store_res_t = logic
 ) (
   /// Clock, positive edge triggered.
   input  logic clk_i,
   /// Asynchronous reset, active low.
   input  logic rst_ni,
   /// Request to the eviction unit, has to be high so that valid is eventually set.
-  input  logic req_i,
+  input  logic evict_i,
+  /// Request to Hit logic of PLRU Unit, has to be high to set the PLRU Bits in Hit.
+  input logic hit_i,
+  ///
+  input logic bist_i,
+  /// Res_indicator signal to determine the hit way inside the index
+  input  way_ind_t   res_indicator,
   /// All valid tags as input. This indicates if there are still free ways for putting in data.
   input  way_ind_t tag_valid_i,
   /// All dirty flags as input. This indicates us if we have to write back the data.
   input  way_ind_t tag_dirty_i,
   /// All SPM configured ways. So that the output indicator does not point to a SPM way.
   input  way_ind_t spm_lock_i,
+  /// Ram Index for the update in PLRU Unit
+  input logic [Cfg.IndexLength-1:0] ram_index,
   /// Way indicator for action to be performed. Is a onehot signal.
   output way_ind_t way_ind_o,
   /// Evict the line.
   output logic evict_o,
-  /// Output is valid. This signal will eventually go to high if `req_i` is 1.
-  output logic valid_o
+  /// Output is valid. This signal will eventually go to high if `evict_i` is 1.
+  output logic valid_o,
+  /// Valid Hit after Updation
+  output logic valid_o_plru,
+  
+  /// Inputs/OUTPUTS for MEMORY BIST
+  /// BIST activation (from tag_store unit)
+  input logic plru_gen_valid,
+  /// BIST Ready for DATA
+  output logic plru_gen_ready,
+  /// BIST result (reg)output (For Memory fault test)
+  output way_ind_t plru_bist_res_o,
+  /// BIST End signal
+  output logic plru_gen_eoc
 );
+
   `include "common_cells/registers.svh"
-  // Mask which tells us which way have something in them (valid or spm)
-  way_ind_t occupied;
-  logic     en_cnt;                     // enables the counter for 'randomness'
-  way_ind_t onehot_ind_q, onehot_ind_d; // counter output converted to onehot
 
-  assign occupied = tag_valid_i | spm_lock_i;
-  // hold the output (stop the counter) if we have a request and we have valid output
-  assign en_cnt   = ~(req_i && valid_o);
+  if (Cfg.SetAssociativity > 32'd1) begin : gen_plru	
+ 	
+    axi_llc_plru #(
+      .Cfg            ( Cfg           ),
+      .way_ind_t      ( way_ind_t     ),
+      .store_res_t    ( store_res_t   )
+    )i_plru_gen (
+      .clk_i,
+      .rst_ni,
+      .ram_index      ( ram_index     ),
+      .spm_lock       ( spm_lock_i    ),
+      .tag_valid_i    ( tag_valid_i   ),
+      .tag_dirty_i    ( tag_dirty_i   ),
+      .evict_i        ( evict_i       ),
+      .hit_i          ( hit_i         ),
+      .bist_i         ( bist_i        ),
+      .res_indicator  ( res_indicator ), 
+      .out_way_ind    ( way_ind_o     ),
+      .valid_o	       ( valid_o       ),
+      .evict_o        ( evict_o       ),
+      .valid_o_plru   ( valid_o_plru  ),
+      
+      // INPUTS/OUTPUTS FOR BIST OPERATIONS
+      .plru_gen_valid ( plru_gen_valid),
+      .plru_gen_ready ( plru_gen_ready),
+      .plru_bist_res_o (plru_bist_res_o),
+      .plru_gen_eoc    ( plru_gen_eoc)
+    );
+       
+  end else begin : gen_no_plru
 
-  // determine on which way the operation should go
-  always_comb begin
-    // default assignments
-    way_ind_o = '0;   // output silence
-    valid_o   = 1'b0; // output is valid
-    evict_o   = 1'b0; // we have to evict the old tag, because it is dirty
+    always_comb begin    
+      way_ind_o       = 0;
+      valid_o         = 0;
+      evict_o         = 0;
+      valid_o_plru    = 0;
+      plru_gen_ready  = 1;
+      plru_gen_eoc    = 1;
+      plru_bist_res_o = '0;
 
-    // differentiate between all occupied or some ways still empty
-    // we only have to evict something, if
-    // all ways full, evict something
-    if (req_i) begin
-      // all ways have something in them, evict a not spm way
-      if (occupied == '1) begin
-        if ((spm_lock_i & onehot_ind_q) == '0) begin
-          way_ind_o = onehot_ind_q;
-          valid_o   = 1'b1;
-          // check if we have to evict the old tag, it is dirty
-          if ((tag_dirty_i & onehot_ind_q) != '0) begin
-            evict_o = 1'b1;
-          end
-        end
-      // we have ways to fill, pick a random one
-      end else begin
-        if ((occupied & onehot_ind_q) == '0) begin
-          way_ind_o = onehot_ind_q;
-          valid_o   = 1'b1;
-        end
+      if (evict_i) begin
+        way_ind_o = 1'b1;
+  	    valid_o = 1;
+        if (tag_dirty_i)
+          evict_o = 1'b1;
+        else
+          evict_o = 1'b0;
       end
+      if (hit_i)
+        valid_o_plru = 1'b1;
     end
-  end
 
-  // Shift register to generate 'randomness' the counter is enabled as long as `valid_o` is not set.
-  if (Cfg.SetAssociativity > 32'd1) begin : gen_counter
-    // A shift register where a 1 runs around
-    for (genvar i = 0; unsigned'(i) < Cfg.SetAssociativity; i++) begin : gen_shift
-      if (unsigned'(i) == 32'd0) begin : gen_first
-        `FFLARN(onehot_ind_q[i], onehot_ind_d[i], en_cnt, 1'b1, clk_i, rst_ni)
-        assign onehot_ind_d[Cfg.SetAssociativity-1] = onehot_ind_q[i];
-      end else begin : gen_others
-        `FFLARN(onehot_ind_q[i], onehot_ind_d[i], en_cnt, 1'b0, clk_i, rst_ni)
-        assign onehot_ind_d[i-1] = onehot_ind_q[i];
-      end
-    end
-  end else begin : gen_no_counter
-    assign onehot_ind_q = 1'b1;
   end
+  
 
   // check if the output really is onehot
   // pragma translate_off
   `ifndef VERILATOR
-  check_onehot: assert property ( @(posedge clk_i) disable iff (~rst_ni) $onehot0(way_ind_o)) else
+  check_onehot_out_way: assert property ( @(posedge clk_i) disable iff (~rst_ni) $onehot0(way_ind_o)) else
       $fatal(1, "More than two bit set in the one-hot signal");
+  check_onehot_Set_Asso: assert property ( @(posedge clk_i) disable iff (~rst_ni) $onehot0(Cfg.SetAssociativity)) else
+      $fatal(1, "Set Associativity not compatible with PLRU replacement policy");    
   `endif
   // pragma translate_on
 endmodule
