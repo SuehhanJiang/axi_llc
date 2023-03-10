@@ -32,15 +32,15 @@ module axi_llc_tag_store #(
   input  logic       rst_ni,
   /// Testmode enable
   input  logic       test_i,
-  /// SPM lock signal input.
-  ///
-  /// For each way there is one signal. When high the way is configured as SPM. They are disabled
-  /// for store requests.
-  input  way_ind_t   spm_lock_i,
   /// Flushed indicator from `axi_llc_config`.
   ///
   /// This indicates that a way is flushed. No LOOKUP operations are performed on flushed ways.
   input  way_ind_t   flushed_i,
+  /// Total lock signal input.
+  ///
+  /// For each way there is one signal. When high the way is configured as Locked. They are disabled
+  /// for store requests.
+  input  way_ind_t   total_lock_i,
   /// Tag storage request payload.
   input  store_req_t req_i,
   /// Request to the tag storage is valid.
@@ -384,7 +384,7 @@ module axi_llc_tag_store #(
     .res_indicator  ( hit_inp       ),
     .tag_valid_i    ( tag_val       ),
     .tag_dirty_i    ( tag_dit       ),
-    .spm_lock_i     ( spm_lock_i    ),
+    .total_lock_i   ( total_lock_i  ),
     .ram_index      ( ram_index_inp ),
     .way_ind_o      ( evict_way_ind ),
     .evict_o        ( evict_flag    ),
@@ -392,14 +392,14 @@ module axi_llc_tag_store #(
     .valid_o_plru   ( hit_valid_s   ),
     
     // pins for BIST
-    .plru_gen_valid ( gen_valid     ),
-    .plru_gen_ready ( plru_gen_ready),
+    .plru_gen_valid  ( gen_valid      ),
+    .plru_gen_ready  ( plru_gen_ready ),
     .plru_bist_res_o ( plru_bist_res_o),
-    .plru_gen_eoc    ( plru_gen_eoc)
+    .plru_gen_eoc    ( plru_gen_eoc   )
   );
   
   // Assign plru_bist_valid_o signal for Memory BIST Checking (PLRU ARRAY) 
-  //assign plru_bist_valid_o = (req_q.mode == axi_llc_pkg::BIST) & plru_gen_eoc;
+  assign plru_bist_valid_o = (req_q.mode == axi_llc_pkg::BIST) & plru_gen_eoc;
 
   onehot_to_bin #(
     .ONEHOT_WIDTH ( Cfg.SetAssociativity )

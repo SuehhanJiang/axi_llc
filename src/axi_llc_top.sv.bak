@@ -161,10 +161,8 @@ module axi_llc_top #(
   parameter int unsigned AxiLiteAddrWidth = 32'd0,
   /// AXI4-Lite data field width of the configuration slave port.
   parameter int unsigned AxiLiteDataWidth = 32'd0,
-  /// Parameter for Number of Master's Configured through
-  /// AXI4-Lite Port (Should be in powers of two and >=1)
-  // Configure as 1 if not want to use, default reg -> 0 
-  // Should be < 2*(AxiCfg.slvIDWidth), For compatibility  
+  /// AXI4 - Lite Cfg Registers for cache partitioning (Number of CfgReg)
+  /// Should be a power of 2 (And should be 1 or higher) //////// ------------------(Create an assertion error if not -->) 
   parameter int unsigned NumCfgRegcp = 32'd1,
   /// AXI4+ATOP request type on the slave port.
   /// Expected format can be defined using `AXI_TYPEDEF_REQ_T.
@@ -222,7 +220,8 @@ module axi_llc_top #(
   /// Events output, for tracked events see `axi_llc_pkg`.
   ///
   /// When not used, leave open.
-  output axi_llc_pkg::events_t axi_llc_events_o
+  output axi_llc_pkg::events_t axi_llc_events_o,
+  input int file_op // Delete Later
 );
   `include "axi/typedef.svh"
 
@@ -611,7 +610,8 @@ module axi_llc_top #(
     .r_unlock_gnt_o ( r_unlock_gnt ),
     .cnt_down_i     ( cnt_down     ),
     .bist_res_o     ( bist_res     ),
-    .bist_valid_o   ( bist_valid   )
+    .bist_valid_o   ( bist_valid   ),
+    .file_op	     (file_op      )
   );
 
   axi_llc_evict_unit #(
@@ -963,6 +963,9 @@ module axi_llc_top #(
     // Check for NumCfgRegscp (power of two or not) and Set_Asso Compatibility
     CfgRegs_Valid : assert($onehot0(NumCfgRegcp) || (NumCfgRegcp == 1)) else
       $fatal(1, "Parameter `NumCfgRegcp` has to be power of 2 or 1!");
+      
+    CfgRegs_compatibility : assert ((SetAssociativity == 1) && (NumCfgRegcp == 1)) else
+      $fatal(1, "`NumCfgRegcp` has to 1 when `Set_Associativity` is 1");
 
     // check the address rule fields for the right size
     axi_start_addr : assert($bits(cached_addr_rule.start_addr) == AxiAddrWidth) else

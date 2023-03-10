@@ -46,7 +46,14 @@ module axi_llc_hit_miss #(
   /// } cnt_t;
   parameter type                       cnt_t     = logic,
   /// Way indicator, is a onehot signal with width: `Cfg.SetAssociativity`.
-  parameter type                       way_ind_t = logic
+  parameter type                       way_ind_t = logic,
+  /// Bitmask assigned by Config Registers (AXI4-Lite port) for Cache Partitioning
+  parameter type 			bitmask_ind_t = logic,
+  /// AXI4 - Lite Cfg Registers for cache partitioning (Number of CfgReg)
+  /// Should be a power of 2 (And should be 1 or higher)
+  parameter int unsigned		NumCfgRegcp = 32'd1,
+  /// Kbit selection from AXI_ID bits for Master Selection
+  parameter int unsigned Kbit_AXIID = (NumCfgRegcp == 1) ? 1 : $clog2(NumCfgRegcp)
 ) (
   /// Clock, positive edge triggered.
   input  logic     clk_i,
@@ -69,6 +76,7 @@ module axi_llc_hit_miss #(
   // Configuration input
   input  way_ind_t spm_lock_i,
   input  way_ind_t flushed_i,
+  input  bitmask_ind_t id_bitmask_i,
   // unlock inputs from the units
   input  lock_t    w_unlock_i,
   input  logic     w_unlock_req_i,
@@ -328,6 +336,19 @@ module axi_llc_hit_miss #(
       end
     end
   end
+  
+
+  /// Logics for k-bit sampling from AXI_ID 
+  /// Assigning total lock (Spm_Lock | bitmask_lock)
+  logic [Kbit_AXIID-1:0] temp_bitmask;
+  way_ind_t axiID_bitmask, total_lock_i, total_lock_i_d, total_lock_i_q;
+  assign temp_bitmask = desc_i.a_x_id[AxiCfg.SlvPortIdWidth-1 : AxiCfg.SlvPortIdWidth-Kbit_AXIID];
+  assign axiID_bitmask = (NumCfgRegcp == 1) ? '0 : id_bitmask_i[temp_bitmask];
+  assign total_lock_i = spm_lock_i | axiID_bitmask;
+  
+  // 2-Cycle delay for total_lock_i, so that PLRU unit gets correct value of total_lock
+  `FFLARN(total_lock_i_d, total_lock_i, 1'b1, '0, clk_i, rst_ni)
+  `FFLARN(total_lock_i_q, total_lock_i_d, 1'b1, '0, clk_i, rst_ni)
 
   axi_llc_tag_store #(
     .Cfg         ( Cfg         ),
@@ -338,8 +359,8 @@ module axi_llc_hit_miss #(
     .clk_i,
     .rst_ni,
     .test_i,
-    .spm_lock_i   ( spm_lock_i      ),
     .flushed_i    ( flushed_i       ),
+    .total_lock_i ( total_lock_i_q  ),
     .req_i        ( store_req       ),
     .valid_i      ( store_req_valid ),
     .ready_o      ( store_req_ready ),

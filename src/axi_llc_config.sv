@@ -159,9 +159,14 @@ module axi_llc_config #(
   parameter type rule_full_t = logic,
   /// Type for indicating the set associativity, same as way_ind_t in `axi_llc_top`.
   parameter type set_asso_t = logic,
+  /// Bitmask assigned by Config Registers (AXI4-Lite port) for Cache Partitioning 
+  parameter type bitmask_ind_t = logic,
   /// Address type for the memory regions defined for caching and SPM. The same width as
   /// the address field of the AXI4+ATOP slave and master port.
-  parameter type addr_full_t = logic
+  parameter type addr_full_t = logic,
+  /// AXI4 - Lite Cfg Registers for cache partitioning (Number of CfgReg)
+  // Allowed in powers of 2 
+  parameter int unsigned NumCfgRegcp = 32'd1
 ) (
   /// Rising-edge clock
   input logic clk_i,
@@ -184,6 +189,10 @@ module axi_llc_config #(
   /// This signal defines all ways which are flushed and have no valid tags in them.
   /// Tags are not looked up in the ways which are flushed.
   output set_asso_t flushed_o,
+  /// Bitmask created by axi_id 
+  ///
+  /// Can be set over AXI4- lite port, to handle cache partitioning
+  output bitmask_ind_t id_bitmask_o,
   /// Flush descriptor output.
   ///
   /// Payload data for flush descriptors. These descriptors are generated either by configuring
@@ -260,27 +269,35 @@ module axi_llc_config #(
 
   // Definition of the configuration registers.
   // The registers are aligned to `AlignToBytes`.
-  localparam int unsigned NumCfgRegs      = 32'd8;
+  localparam int unsigned NumCfgRegs      = 32'd8 + NumCfgRegcp;
   localparam int unsigned NumBytesCfgRegs = AlignToBytes * NumCfgRegs;
+  
+  //typedef for Config Registers for AXIIDs (Cache Partitioning Config Regs)
+  typedef logic [NumCfgRegcp-1:0][Cfg.SetAssociativity-1:0] id_set_asso_t;
+  typedef logic [NumCfgRegcp-1:0][SetAssoPadWidth-1:0] id_pad_asso_t;
+  typedef logic [NumCfgRegcp-1:0][AlignToBytes-1:0] id_strb_cfg_t;
 
   // Define the struct mapping of all configuration registers.
   // Functional bits are byte aligned to `AlignToBytes`.
   typedef struct packed {
-    data_cfg_t Version;     // read only, fixed
-    data_cfg_t NumBlocks;   // read only, fixed
-    data_cfg_t NumLines;    // read only, fixed
-    data_cfg_t SetAsso;     // read only, fixed
-    pad_asso_t PadBistOut;  // Map to '0
-    set_asso_t BistOut;     // read only
-    pad_asso_t PadFlushed;  // Map to '0
-    set_asso_t Flushed;     // read only
-    pad_asso_t PadFlush;    // Map to '0
-    set_asso_t CfgFlush;    // read and write
-    pad_asso_t PadSpm;      // Map to '0
-    set_asso_t CfgSpm;      // read and write
+    id_pad_asso_t PadCfgRegID;// Map to '0
+    id_set_asso_t CfgRegID;   // read and write
+    data_cfg_t Version;       // read only, fixed
+    data_cfg_t NumBlocks;     // read only, fixed
+    data_cfg_t NumLines;      // read only, fixed
+    data_cfg_t SetAsso;       // read only, fixed
+    pad_asso_t PadBistOut;    // Map to '0
+    set_asso_t BistOut;       // read only
+    pad_asso_t PadFlushed;    // Map to '0
+    set_asso_t Flushed;       // read only
+    pad_asso_t PadFlush;      // Map to '0
+    set_asso_t CfgFlush;      // read and write
+    pad_asso_t PadSpm;        // Map to '0
+    set_asso_t CfgSpm;        // read and write
   } struct_reg_data_t;
   // Struct for strobe values for each register:
   typedef struct packed {
+    id_strb_cfg_t CfgRegID;
     strb_cfg_t Version;
     strb_cfg_t NumBlocks;
     strb_cfg_t NumLines;
@@ -319,14 +336,15 @@ module axi_llc_config #(
 
   // define the read-only values for the individual aligned registers as a struct
   localparam struct_reg_strb_t CfgReadOnlyStruct = struct_reg_strb_t'{
-    Version:   {AlignToBytes{1'b1}}, // read-only
-    NumBlocks: {AlignToBytes{1'b1}}, // read-only
-    NumLines:  {AlignToBytes{1'b1}}, // read-only
-    SetAsso:   {AlignToBytes{1'b1}}, // read-only
-    BistOut:   {AlignToBytes{1'b1}}, // read-only
-    Flushed:   {AlignToBytes{1'b1}}, // read-only
-    CfgFlush:  {AlignToBytes{1'b0}}, // read and write
-    CfgSpm:    {AlignToBytes{1'b0}}  // read and write
+    CfgRegID:  {NumCfgRegcp*AlignToBytes{1'b0}}, // read and write
+    Version:   {AlignToBytes{1'b1}}, 		// read-only
+    NumBlocks: {AlignToBytes{1'b1}}, 		// read-only
+    NumLines:  {AlignToBytes{1'b1}}, 		// read-only
+    SetAsso:   {AlignToBytes{1'b1}}, 		// read-only
+    BistOut:   {AlignToBytes{1'b1}}, 		// read-only
+    Flushed:   {AlignToBytes{1'b1}}, 		// read-only
+    CfgFlush:  {AlignToBytes{1'b0}}, 		// read and write
+    CfgSpm:    {AlignToBytes{1'b0}}          // read and write
   };
 
   // tool compatibilty: cast struct onto a union
@@ -425,6 +443,7 @@ module axi_llc_config #(
     // Ensure that the struct padding is always '0!
     // Not used fields are also tied to '0!
     config_d.StructMap = struct_reg_data_t'{
+      CfgRegID:  config_q.StructMap.CfgRegID,
       Version:   data_cfg_t'(axi_llc_pkg::AxiLlcVersion),
       NumBlocks: data_cfg_t'(Cfg.NumBlocks),
       NumLines:  data_cfg_t'(Cfg.NumLines),
@@ -437,9 +456,10 @@ module axi_llc_config #(
     };
     // load enables, default is zero, if needed set below
     config_load.StrbMap = struct_reg_strb_t'{
+      CfgRegID: {NumCfgRegcp*AlignToBytes{1'b1}}, //default one to prevent overwrite from AXI on flush
       BistOut:  {AlignToBytes{bist_valid_i}},
       CfgFlush: {AlignToBytes{1'b1}},        // default one to prevent overwrite from AXI on flush
-      CfgSpm:   {AlignToBytes{1'b1}},        // default one to prevent overwrite from AXI on flush
+      CfgSpm:   {AlignToBytes{1'b1}},        // default one to prevent overwrite from AXI on flush 
       default: '0
     };
     // Flush state machine
@@ -459,10 +479,11 @@ module axi_llc_config #(
     // FSM for controlling the AW AR input to the cache and flush control
     unique case (flush_state_q)
       FsmIdle:  begin
-        // this state is normal operation, allow Cfg editing of the fields `CfgSpm` and `CfgFlush`
+        // this state is normal operation, allow Cfg editing of the fields `CfgSpm`,  `CfgFlush` and `CfgRegID`
         // and do not isolate main AXI
         config_load.StrbMap.CfgSpm   = strb_cfg_t'(1'b0);
         config_load.StrbMap.CfgFlush = strb_cfg_t'(1'b0);
+        config_load.StrbMap.CfgRegID = id_strb_cfg_t'(1'b0);
         llc_isolate_o                = 1'b0;
         // Change state, if there is a flush request, i.e. if one of the configuration fields
         // has been written by AXI
@@ -589,6 +610,7 @@ module axi_llc_config #(
   // Configuration registers which are used in other modules.
   assign spm_lock_o = config_q.StructMap.CfgSpm;
   assign flushed_o  = config_q.StructMap.Flushed;
+  assign id_bitmask_o = config_q.StructMap.CfgRegID;
 
   // This trailing zero counter determines which way should be flushed next.
   lzc #(

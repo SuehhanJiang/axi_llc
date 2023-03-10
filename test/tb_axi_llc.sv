@@ -27,6 +27,11 @@ module tb_axi_llc #(
   parameter int unsigned TbNumWrites        = 32'd1100,
   /// Number of random read transactions in a testblock.
   parameter int unsigned TbNumReads         = 32'd1500,
+  /// Parameter for Number of Master's Configured through
+  /// AXI4-Lite Port (Should be in powers of two and >=1)
+  // Configure as 1 if not want to use, default reg -> 0 
+  // Should be < 2*(AxiCfg.slvIDWidth), For compatibility 
+  parameter int unsigned TbNumCfgRegcp      = 32'd8,
   /// Cycle time for the TB clock generator
   parameter time         TbCyclTime         = 10ns,
   /// Application time to the DUT
@@ -34,6 +39,7 @@ module tb_axi_llc #(
   /// Test time of the DUT
   parameter time         TbTestTime         = 8ns
 );
+   
   /////////////////////////////
   // Axi channel definitions //
   /////////////////////////////
@@ -98,7 +104,11 @@ module tb_axi_llc #(
     SetAsso   = axi_lite_addr_t'(8'h20),
     NumLines  = axi_lite_addr_t'(8'h28),
     NumBlocks = axi_lite_addr_t'(8'h30),
-    Version   = axi_lite_addr_t'(8'h38)
+    Version   = axi_lite_addr_t'(8'h38),
+    CfgRegID0 = axi_lite_addr_t'(8'h40),
+    CfgRegID4 = axi_lite_addr_t'(8'h44)
+  //  CfgRegID8 = axi_lite_addr_t'(8'h48),
+ //   CfgRegID10 = axi_lite_addr_t'(8'h50)
   } llc_cfg_addr_e;
 
   ////////////////////////////////
@@ -285,7 +295,7 @@ module tb_axi_llc #(
     enable_counters = 1'b0;
     print_counters  = 1'b0;
     enable_progress = 1'b0;
-
+    
     // Set some mem regions for rand axi master
     axi_master.add_memory_region(CachedRegionStart, CachedRegionStart + 2*CachedRegionLength,
                                  axi_pkg::WBACK_RWALLOCATE);
@@ -310,8 +320,39 @@ module tb_axi_llc #(
     axi_lite_master.read(NumLines,  lite_prot, lite_rdata, lite_resp);
     axi_lite_master.read(NumBlocks, lite_prot, lite_rdata, lite_resp);
     axi_lite_master.read(Version,   lite_prot, lite_rdata, lite_resp);
+    axi_lite_master.read(CfgRegID0,   lite_prot, lite_rdata, lite_resp);
+    axi_lite_master.read(CfgRegID4,   lite_prot, lite_rdata, lite_resp);
+  //  axi_lite_master.read(CfgRegID8,   lite_prot, lite_rdata, lite_resp);
+  //  axi_lite_master.read(CfgRegID10,   lite_prot, lite_rdata, lite_resp);
 
     $info("Random read and write");
+ 
+    lite_addr  = CfgRegID0;
+    lite_wdata = axi_lite_data_t'((TbSetAssociativity == 32'd1) ? 32'd1 : 32'h0000_4080);
+    lite_wstrb = axi_lite_strb_t'({TbAxiStrbWidthLite{1'b1}});
+    axi_lite_master.write(lite_addr, lite_prot, lite_wdata, lite_wstrb, lite_resp);
+   
+    lite_addr  = CfgRegID4;
+    lite_wdata = axi_lite_data_t'((TbSetAssociativity == 32'd1) ? 32'd1 : 32'h2010_0090);
+    lite_wstrb = axi_lite_strb_t'({TbAxiStrbWidthLite{1'b1}});
+    axi_lite_master.write(lite_addr, lite_prot, lite_wdata, lite_wstrb, lite_resp);
+ /*   
+    lite_addr  = CfgRegID8;
+    lite_wdata = axi_lite_data_t'((TbSetAssociativity == 32'd1) ? 32'd1 : 32'h0030_0040);
+    lite_wstrb = axi_lite_strb_t'({TbAxiStrbWidthLite{1'b1}});
+    axi_lite_master.write(lite_addr, lite_prot, lite_wdata, lite_wstrb, lite_resp);
+    
+    lite_addr  = CfgRegID10;
+    lite_wdata = axi_lite_data_t'((TbSetAssociativity == 32'd1) ? 32'd1 : 32'h0050_4080);
+    lite_wstrb = axi_lite_strb_t'({TbAxiStrbWidthLite{1'b1}});
+    axi_lite_master.write(lite_addr, lite_prot, lite_wdata, lite_wstrb, lite_resp);
+   */
+   
+    lite_addr  = CfgSpm;
+    lite_wdata = axi_lite_data_t'({((TbSetAssociativity == 32'd1) ? 32'd1 : (TbSetAssociativity/2)){1'b1}});
+    lite_wstrb = axi_lite_strb_t'({TbAxiStrbWidthLite{1'b1}});
+    axi_lite_master.write(lite_addr, lite_prot, lite_wdata, lite_wstrb, lite_resp);
+    
     axi_master.run(TbNumReads, TbNumWrites);
     flush_all(axi_lite_master);
     compare_mems(cpu_scoreboard, mem_scoreboard);
@@ -418,6 +459,7 @@ module tb_axi_llc #(
     .AxiUserWidth     ( TbAxiUserWidthFull ),
     .AxiLiteAddrWidth ( TbAxiAddrWidthLite ),
     .AxiLiteDataWidth ( TbAxiDataWidthLite ),
+    .NumCfgRegcp      ( TbNumCfgRegcp      ),
     .slv_req_t        ( axi_slv_req_t      ),
     .slv_resp_t       ( axi_slv_resp_t     ),
     .mst_req_t        ( axi_mst_req_t      ),

@@ -59,6 +59,35 @@ add wave -position end -label "out_valid_dist" sim:/tb_axi_llc/i_axi_llc_dut/i_l
 
 
 
+add wave -position end -divider "HIT MISS UNIT"
+add wave -position end -label "Desc_i_ID"       sim:/tb_axi_llc/i_axi_llc_dut/i_hit_miss_unit/desc_i.a_x_id
+add wave -position end -label "Desc_valid_i"       sim:/tb_axi_llc/i_axi_llc_dut/i_hit_miss_unit/valid_i
+add wave -position end -label "Sel_Bits"       sim:/tb_axi_llc/i_axi_llc_dut/i_hit_miss_unit/temp_bitmask
+add wave -position end -label "Locked_Conf_Reg"       sim:/tb_axi_llc/i_axi_llc_dut/i_hit_miss_unit/id_bitmask_i
+add wave -position end -label "Lock_Select"       sim:/tb_axi_llc/i_axi_llc_dut/i_hit_miss_unit/axiID_bitmask
+add wave -position end -label "Spm_Lock"       sim:/tb_axi_llc/i_axi_llc_dut/i_hit_miss_unit/spm_lock_i
+add wave -position end -label "Total_Lock"       sim:/tb_axi_llc/i_axi_llc_dut/i_hit_miss_unit/total_lock_i
+
+
+
+
+add wave -position end -divider "HIT MISS DETECTION"
+add wave -position end -label "Desc_to_Tag_Store"       sim:/tb_axi_llc/i_axi_llc_dut/i_hit_miss_unit/store_req
+add wave -position end -label "tag_store_req_q"       sim:/tb_axi_llc/i_axi_llc_dut/i_hit_miss_unit/i_tag_store/req_q
+add wave -position end -label "tag_store_hit_req"       sim:/tb_axi_llc/i_axi_llc_dut/i_hit_miss_unit/i_tag_store/hit_req
+add wave -position end -label "tag_Store_hit_inp"       sim:/tb_axi_llc/i_axi_llc_dut/i_hit_miss_unit/i_tag_store/hit_inp
+add wave -position end -label "tag_store_evict_req"       sim:/tb_axi_llc/i_axi_llc_dut/i_hit_miss_unit/i_tag_store/evict_req
+add wave -position end -label "tag_store_bist_req"       sim:/tb_axi_llc/i_axi_llc_dut/i_hit_miss_unit/i_tag_store/bist_req
+add wave -position end -label "total_lock_i"       sim:/tb_axi_llc/i_axi_llc_dut/i_hit_miss_unit/i_tag_store/total_lock_i
+add wave -position end -label "plru_out_way_ind"       sim:/tb_axi_llc/i_axi_llc_dut/i_hit_miss_unit/i_tag_store/i_evict_box/way_ind_o
+add wave -position end -label "plru_valid_o"       sim:/tb_axi_llc/i_axi_llc_dut/i_hit_miss_unit/i_tag_store/i_evict_box/valid_o
+add wave -position end -label "plru_valid_o_pl"       sim:/tb_axi_llc/i_axi_llc_dut/i_hit_miss_unit/i_tag_store/i_evict_box/valid_o_plru
+add wave -position end -label "plru_evict_o"       sim:/tb_axi_llc/i_axi_llc_dut/i_hit_miss_unit/i_tag_store/i_evict_box/evict_o
+add wave -position end -label "Desc_from_Tag_Store"       sim:/tb_axi_llc/i_axi_llc_dut/i_hit_miss_unit/store_res
+
+
+
+
 run 61ns
 #mem load -i /scratch/msc19f10/llc/umcL65/modelsim/scripts/memcontent/main.mem -format mti -startaddress 4095 -endaddress 0 /tb_axi_llc/i_memory/ram
 

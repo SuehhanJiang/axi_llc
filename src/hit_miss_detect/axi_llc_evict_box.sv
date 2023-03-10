@@ -33,8 +33,8 @@ module axi_llc_evict_box #(
   input  way_ind_t tag_valid_i,
   /// All dirty flags as input. This indicates us if we have to write back the data.
   input  way_ind_t tag_dirty_i,
-  /// All SPM configured ways. So that the output indicator does not point to a SPM way.
-  input  way_ind_t spm_lock_i,
+  /// All total_locked ways. So that the output indicator does not point to a Locked way.
+  input  way_ind_t total_lock_i,
   /// Ram Index for the update in PLRU Unit
   input logic [Cfg.IndexLength-1:0] ram_index,
   /// Way indicator for action to be performed. Is a onehot signal.
@@ -69,7 +69,7 @@ module axi_llc_evict_box #(
       .clk_i,
       .rst_ni,
       .ram_index      ( ram_index     ),
-      .spm_lock       ( spm_lock_i    ),
+      .total_lock     ( total_lock_i  ),
       .tag_valid_i    ( tag_valid_i   ),
       .tag_dirty_i    ( tag_dirty_i   ),
       .evict_i        ( evict_i       ),
@@ -82,10 +82,10 @@ module axi_llc_evict_box #(
       .valid_o_plru   ( valid_o_plru  ),
       
       // INPUTS/OUTPUTS FOR BIST OPERATIONS
-      .plru_gen_valid ( plru_gen_valid),
-      .plru_gen_ready ( plru_gen_ready),
-      .plru_bist_res_o (plru_bist_res_o),
-      .plru_gen_eoc    ( plru_gen_eoc)
+      .plru_gen_valid  ( plru_gen_valid  ),
+      .plru_gen_ready  ( plru_gen_ready  ),
+      .plru_bist_res_o ( plru_bist_res_o ),
+      .plru_gen_eoc    ( plru_gen_eoc    )
     );
        
   end else begin : gen_no_plru
@@ -104,11 +104,11 @@ module axi_llc_evict_box #(
   	    valid_o = 1;
         if (tag_dirty_i)
           evict_o = 1'b1;
-        else
+        else 
           evict_o = 1'b0;
       end
       if (hit_i)
-        valid_o_plru = 1'b1;
+        valid_o_plru = 1'b1;   
     end
 
   end
