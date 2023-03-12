@@ -164,7 +164,7 @@ module axi_llc_top #(
   /// Parameter for Number of Master's Configured through
   /// AXI4-Lite Port (Should be in powers of two and >=1)
   // Configure as 1 if not want to use, default reg -> 0 
-  // Should be < 2*(AxiCfg.slvIDWidth), For compatibility  
+  // Should be < 2*(AxiCfg.slvIDWidth), for compatibility  
   parameter int unsigned NumCfgRegcp = 32'd1,
   /// AXI4+ATOP request type on the slave port.
   /// Expected format can be defined using `AXI_TYPEDEF_REQ_T.
