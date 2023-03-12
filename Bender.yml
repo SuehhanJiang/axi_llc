@@ -34,6 +34,7 @@ sources:
   - src/hit_miss_detect/axi_llc_miss_counters.sv
   - src/hit_miss_detect/axi_llc_tag_pattern_gen.sv
   # Level 1
+  - src/hit_miss_detect/axi_llc_plru.sv
   - src/axi_llc_chan_splitter.sv
   - src/axi_llc_evict_unit.sv
   - src/axi_llc_refill_unit.sv
