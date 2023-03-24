@@ -139,6 +139,7 @@
 /// |:--------:|:-----------------------------:|:---------------------------:|
 /// | `[63:0]` | `axi_llc_pkg::AxiLlcVersion`  | Shows the `axi_llc_version` |
 ///
+/// UPDATED THE CONFIG REGISTERS FOR PLRU BIST OUT AND REGISTER ID FOR PARTITIONING 
 module axi_llc_config #(
   /// Static AXI LLC configuration.
   parameter axi_llc_pkg::llc_cfg_t Cfg = axi_llc_pkg::llc_cfg_t'{default: '0},
@@ -240,6 +241,8 @@ module axi_llc_config #(
   input logic flush_desc_recv_i,
   /// Result data of the BIST from the tag storage macros.
   input set_asso_t bist_res_i,
+  /// Result data of the BIST from the PLRU SRAM macros.
+  input set_asso_t plru_bist_res_i,
   /// Result data of the BIST from the tag storage macros is valid.
   input logic bist_valid_i,
   /// Address rule for the AXI memory region which maps onto the cache.
@@ -269,7 +272,7 @@ module axi_llc_config #(
 
   // Definition of the configuration registers.
   // The registers are aligned to `AlignToBytes`.
-  localparam int unsigned NumCfgRegs      = 32'd8 + NumCfgRegcp;
+  localparam int unsigned NumCfgRegs      = 32'd9 + NumCfgRegcp;
   localparam int unsigned NumBytesCfgRegs = AlignToBytes * NumCfgRegs;
   
   //typedef for Config Registers for AXIIDs (Cache Partitioning Config Regs)
@@ -286,6 +289,8 @@ module axi_llc_config #(
     data_cfg_t NumBlocks;     // read only, fixed
     data_cfg_t NumLines;      // read only, fixed
     data_cfg_t SetAsso;       // read only, fixed
+    pad_asso_t PadPlruBistOut;// Map to '0
+    set_asso_t PlruBistOut;   // read only
     pad_asso_t PadBistOut;    // Map to '0
     set_asso_t BistOut;       // read only
     pad_asso_t PadFlushed;    // Map to '0
@@ -302,6 +307,7 @@ module axi_llc_config #(
     strb_cfg_t NumBlocks;
     strb_cfg_t NumLines;
     strb_cfg_t SetAsso;
+    strb_cfg_t PlruBistOut;
     strb_cfg_t BistOut;
     strb_cfg_t Flushed;
     strb_cfg_t CfgFlush;
@@ -336,15 +342,16 @@ module axi_llc_config #(
 
   // define the read-only values for the individual aligned registers as a struct
   localparam struct_reg_strb_t CfgReadOnlyStruct = struct_reg_strb_t'{
-    CfgRegID:  {NumCfgRegcp*AlignToBytes{1'b0}}, // read and write
-    Version:   {AlignToBytes{1'b1}}, 		// read-only
-    NumBlocks: {AlignToBytes{1'b1}}, 		// read-only
-    NumLines:  {AlignToBytes{1'b1}}, 		// read-only
-    SetAsso:   {AlignToBytes{1'b1}}, 		// read-only
-    BistOut:   {AlignToBytes{1'b1}}, 		// read-only
-    Flushed:   {AlignToBytes{1'b1}}, 		// read-only
-    CfgFlush:  {AlignToBytes{1'b0}}, 		// read and write
-    CfgSpm:    {AlignToBytes{1'b0}}          // read and write
+    CfgRegID:    {NumCfgRegcp*AlignToBytes{1'b0}}, // read and write
+    Version:     {AlignToBytes{1'b1}},   // read-only
+    NumBlocks:   {AlignToBytes{1'b1}},   // read-only
+    NumLines:    {AlignToBytes{1'b1}},   // read-only
+    SetAsso:     {AlignToBytes{1'b1}},   // read-only
+    PlruBistOut: {AlignToBytes{1'b1}},   // read-only
+    BistOut:     {AlignToBytes{1'b1}},   // read-only
+    Flushed:     {AlignToBytes{1'b1}},   // read-only
+    CfgFlush:    {AlignToBytes{1'b0}},   // read and write
+    CfgSpm:      {AlignToBytes{1'b0}}    // read and write
   };
 
   // tool compatibilty: cast struct onto a union
@@ -443,23 +450,25 @@ module axi_llc_config #(
     // Ensure that the struct padding is always '0!
     // Not used fields are also tied to '0!
     config_d.StructMap = struct_reg_data_t'{
-      CfgRegID:  config_q.StructMap.CfgRegID,
-      Version:   data_cfg_t'(axi_llc_pkg::AxiLlcVersion),
-      NumBlocks: data_cfg_t'(Cfg.NumBlocks),
-      NumLines:  data_cfg_t'(Cfg.NumLines),
-      SetAsso:   data_cfg_t'(Cfg.SetAssociativity),
-      BistOut:   bist_res_i,
-      Flushed:   config_q.StructMap.Flushed,
-      CfgFlush:  config_q.StructMap.CfgFlush,
-      CfgSpm:    config_q.StructMap.CfgSpm,
+      CfgRegID:      config_q.StructMap.CfgRegID,
+      Version:       data_cfg_t'(axi_llc_pkg::AxiLlcVersion),
+      NumBlocks:     data_cfg_t'(Cfg.NumBlocks),
+      NumLines:      data_cfg_t'(Cfg.NumLines),
+      SetAsso:       data_cfg_t'(Cfg.SetAssociativity),
+      PlruBistOut:   plru_bist_res_i,
+      BistOut:       bist_res_i,
+      Flushed:       config_q.StructMap.Flushed,
+      CfgFlush:      config_q.StructMap.CfgFlush,
+      CfgSpm:        config_q.StructMap.CfgSpm,
       default:   '0
     };
     // load enables, default is zero, if needed set below
     config_load.StrbMap = struct_reg_strb_t'{
-      CfgRegID: {NumCfgRegcp*AlignToBytes{1'b1}}, //default one to prevent overwrite from AXI on flush
-      BistOut:  {AlignToBytes{bist_valid_i}},
-      CfgFlush: {AlignToBytes{1'b1}},        // default one to prevent overwrite from AXI on flush
-      CfgSpm:   {AlignToBytes{1'b1}},        // default one to prevent overwrite from AXI on flush 
+      CfgRegID:     {NumCfgRegcp*AlignToBytes{1'b1}}, //default one to prevent overwrite from AXI on flush
+      PlruBistOut:  {AlignToBytes{bist_valid_i}},
+      BistOut:      {AlignToBytes{bist_valid_i}},
+      CfgFlush:     {AlignToBytes{1'b1}},        // default one to prevent overwrite from AXI on flush
+      CfgSpm:       {AlignToBytes{1'b1}},        // default one to prevent overwrite from AXI on flush 
       default: '0
     };
     // Flush state machine
@@ -580,9 +589,9 @@ module axi_llc_config #(
         // the normal SPM configuration.
         if (bist_valid_i) begin
           flush_state_d               = FsmIdle;
-          config_d.StructMap.CfgSpm   = bist_res_i;
+          config_d.StructMap.CfgSpm   = bist_res_i | plru_bist_res_i;
           // No load specified for CfgSpm, as per default the reg is loaded anyway.
-          config_d.StructMap.Flushed  = bist_res_i;
+          config_d.StructMap.Flushed  = bist_res_i | plru_bist_res_i;
           config_load.StrbMap.Flushed = {AlignToBytes{1'b1}};
         end
       end

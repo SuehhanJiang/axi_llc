@@ -56,8 +56,11 @@ module axi_llc_tag_store #(
   /// BIST result output. If one of these bits is high, when `bist_valid_o` is `1`. The
   /// corresponding tag storage SRAM macro failed the test.
   output way_ind_t   bist_res_o,
+  /// PLRU BIST result output. If one of these bits is high, when `plru_bist_valid_o` is `1`. The
+  /// corresponding tag storage SRAM macro failed the test.
+  output way_ind_t   plru_bist_res_o,
   /// BIST output is valid.
-  output logic       bist_valid_o
+  output logic       tbist_valid_o
 );
 
   // typedef, because we use in this module many signals with the width of SetAssiciativity
@@ -119,11 +122,10 @@ module axi_llc_tag_store #(
   // Response output into the spill register
   store_res_t res;
   logic       res_valid,   res_ready;
+  // Bist Valid Signal for PLRU and Tag Storage SRAMs
+  logic       bist_valid_o, plru_bist_valid_o;
   
-  // BIST OUTPUT SIGNALS (Currently not connected to hardware)
-  way_ind_t plru_bist_res_o;
-  logic       plru_bist_valid_o;
-
+  
 
   // macro control
   always_comb begin : proc_macro_ctrl
@@ -400,6 +402,8 @@ module axi_llc_tag_store #(
   
   // Assign plru_bist_valid_o signal for Memory BIST Checking (PLRU ARRAY) 
   assign plru_bist_valid_o = (req_q.mode == axi_llc_pkg::BIST) & plru_gen_eoc;
+  // Assign Total Bist Valid output (For MBIST)
+  assign tbist_valid_o = bist_valid_o & plru_bist_valid_o;
 
   onehot_to_bin #(
     .ONEHOT_WIDTH ( Cfg.SetAssociativity )

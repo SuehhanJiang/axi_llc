@@ -59,6 +59,50 @@ add wave -position end -label "out_valid_dist" sim:/tb_axi_llc/i_axi_llc_dut/i_l
 
 
 
+
+
+add wave -position end -divider "AXI ISOLATE"
+add wave -position end -label "Isolate_IN_slv_req_i"       sim:/tb_axi_llc/i_axi_llc_dut/i_axi_isolate_flush/slv_req_i
+add wave -position end -label "Isolate_OUT_demux_req"       sim:/tb_axi_llc/i_axi_llc_dut/i_axi_isolate_flush/mst_req_o
+add wave -position end -label "LLC_Isolate_i"       sim:/tb_axi_llc/i_axi_llc_dut/i_axi_isolate_flush/isolate_i
+add wave -position end -label "LLC_Isolated_o"       sim:/tb_axi_llc/i_axi_llc_dut/i_axi_isolate_flush/isolated_o
+
+
+add wave -position end -divider "AXI DEMUX"
+add wave -position end -label "DEMUX_IN_slv_req_i"       sim:/tb_axi_llc/i_axi_llc_dut/i_axi_bypass_demux/slv_req_i
+add wave -position end -label "DEMUX_Control_AW"       sim:/tb_axi_llc/i_axi_llc_dut/i_axi_bypass_demux/slv_aw_select_i
+add wave -position end -label "DEMUX_Control_AR"       sim:/tb_axi_llc/i_axi_llc_dut/i_axi_bypass_demux/slv_ar_select_i
+add wave -position end -label "DEMUX_OUT_mst_reqs_o"       sim:/tb_axi_llc/i_axi_llc_dut/i_axi_bypass_demux/mst_reqs_o
+
+
+add wave -position end -divider "AXI AW CHAN SPLITTER"
+add wave -position end -label "SPLIT_AW"       sim:/tb_axi_llc/i_axi_llc_dut/i_aw_splitter/ax_chan_slv_i
+add wave -position end -label "SPLIT_AW_VALID"       sim:/tb_axi_llc/i_axi_llc_dut/i_aw_splitter/ax_chan_valid_i
+add wave -position end -label "SPLIT_AW_READY"       sim:/tb_axi_llc/i_axi_llc_dut/i_aw_splitter/ax_chan_ready_o
+add wave -position end -label "SPLIT_DESC_O"       sim:/tb_axi_llc/i_axi_llc_dut/i_aw_splitter/desc_o
+
+
+add wave -position end -divider "AXI AR CHAN SPLITTER"
+add wave -position end -label "SPLIT_AR"       sim:/tb_axi_llc/i_axi_llc_dut/i_ar_splitter/ax_chan_slv_i
+add wave -position end -label "SPLIT_AR_VALID"       sim:/tb_axi_llc/i_axi_llc_dut/i_ar_splitter/ax_chan_valid_i
+add wave -position end -label "SPLIT_AR_READY"       sim:/tb_axi_llc/i_axi_llc_dut/i_ar_splitter/ax_chan_ready_o
+add wave -position end -label "SPLIT_DESC_O"       sim:/tb_axi_llc/i_axi_llc_dut/i_ar_splitter/desc_o
+
+
+
+add wave -position end -divider "RR_ARB_COMBINE"
+add wave -position end -label "RR_ARB_OUT"       sim:/tb_axi_llc/i_axi_llc_dut/i_rw_arb_tree/data_o
+
+
+add wave -position end -divider "SPILL_REGISTER"
+add wave -position end -label "SPILL_REG"       sim:/tb_axi_llc/i_axi_llc_dut/i_rw_spill/data_o
+
+
+
+
+
+
+
 add wave -position end -divider "HIT MISS UNIT"
 add wave -position end -label "Desc_i_ID"       sim:/tb_axi_llc/i_axi_llc_dut/i_hit_miss_unit/desc_i.a_x_id
 add wave -position end -label "Desc_valid_i"       sim:/tb_axi_llc/i_axi_llc_dut/i_hit_miss_unit/valid_i

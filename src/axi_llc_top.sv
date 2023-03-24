@@ -390,7 +390,7 @@ module axi_llc_top #(
   bitmask_ind_t id_bitmask;
 
   // BIST from tag_store
-  logic [Cfg.SetAssociativity-1:0] bist_res;
+  logic [Cfg.SetAssociativity-1:0] bist_res, plru_bist_res;
   logic                            bist_valid;
 
   // global flush signals
@@ -444,6 +444,7 @@ module axi_llc_top #(
     .flush_desc_recv_i ( flush_recv                             ),
     // BIST input
     .bist_res_i        ( bist_res                               ),
+    .plru_bist_res_i   ( plru_bist_res		          ),
     .bist_valid_i      ( bist_valid                             ),
     // address rules for bypass selection
     .axi_cached_rule_i ( cached_addr_rule                       ),
@@ -592,26 +593,27 @@ module axi_llc_top #(
     .clk_i,
     .rst_ni,
     .test_i,
-    .desc_i         ( spill_desc   ),
-    .valid_i        ( spill_valid  ),
-    .ready_o        ( spill_ready  ),
-    .desc_o         ( desc         ),
-    .miss_valid_o   ( miss_valid   ),
-    .miss_ready_i   ( miss_ready   ),
-    .hit_valid_o    ( hit_valid    ),
-    .hit_ready_i    ( hit_ready    ),
-    .spm_lock_i     ( spm_lock     ),
-    .flushed_i      ( flushed      ),
-    .id_bitmask_i   ( id_bitmask   ),
-    .w_unlock_i     ( w_unlock     ),
-    .w_unlock_req_i ( w_unlock_req ),
-    .w_unlock_gnt_o ( w_unlock_gnt ),
-    .r_unlock_i     ( r_unlock     ),
-    .r_unlock_req_i ( r_unlock_req ),
-    .r_unlock_gnt_o ( r_unlock_gnt ),
-    .cnt_down_i     ( cnt_down     ),
-    .bist_res_o     ( bist_res     ),
-    .bist_valid_o   ( bist_valid   )
+    .desc_i         	( spill_desc    ),
+    .valid_i        	( spill_valid   ),
+    .ready_o        	( spill_ready   ),
+    .desc_o         	( desc          ),
+    .miss_valid_o   	( miss_valid    ),
+    .miss_ready_i   	( miss_ready    ),
+    .hit_valid_o    	( hit_valid     ),
+    .hit_ready_i    	( hit_ready     ),
+    .spm_lock_i     	( spm_lock      ),
+    .flushed_i      	( flushed       ),
+    .id_bitmask_i   	( id_bitmask    ),
+    .w_unlock_i     	( w_unlock      ),
+    .w_unlock_req_i 	( w_unlock_req  ),
+    .w_unlock_gnt_o 	( w_unlock_gnt  ),
+    .r_unlock_i     	( r_unlock      ),
+    .r_unlock_req_i 	( r_unlock_req  ),
+    .r_unlock_gnt_o 	( r_unlock_gnt  ),
+    .cnt_down_i     	( cnt_down      ),
+    .bist_res_o     	( bist_res      ),
+    .plru_bist_res_o	( plru_bist_res ),
+    .bist_valid_o   	( bist_valid    )
   );
 
   axi_llc_evict_unit #(

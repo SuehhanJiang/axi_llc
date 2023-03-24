@@ -97,18 +97,19 @@ module tb_axi_llc #(
 
   // Config register addresses
   typedef enum logic [TbAxiAddrWidthLite-1:0] {
-    CfgSpm    = axi_lite_addr_t'(8'h00),
-    CfgFlush  = axi_lite_addr_t'(8'h08),
-    Flushed   = axi_lite_addr_t'(8'h10),
-    BistOut   = axi_lite_addr_t'(8'h18),
-    SetAsso   = axi_lite_addr_t'(8'h20),
-    NumLines  = axi_lite_addr_t'(8'h28),
-    NumBlocks = axi_lite_addr_t'(8'h30),
-    Version   = axi_lite_addr_t'(8'h38),
-    CfgRegID0 = axi_lite_addr_t'(8'h40),
-    CfgRegID4 = axi_lite_addr_t'(8'h44)
-  //  CfgRegID8 = axi_lite_addr_t'(8'h48),
- //   CfgRegID10 = axi_lite_addr_t'(8'h50)
+    CfgSpm        = axi_lite_addr_t'(8'h00),
+    CfgFlush      = axi_lite_addr_t'(8'h08),
+    Flushed       = axi_lite_addr_t'(8'h10),
+    PlruBistOut   = axi_lite_addr_t'(8'h18),
+    BistOut       = axi_lite_addr_t'(8'h20),
+    SetAsso       = axi_lite_addr_t'(8'h28),
+    NumLines      = axi_lite_addr_t'(8'h30),
+    NumBlocks     = axi_lite_addr_t'(8'h38),
+    Version       = axi_lite_addr_t'(8'h40),
+    CfgRegID0     = axi_lite_addr_t'(8'h48),
+    CfgRegID4     = axi_lite_addr_t'(8'h50)
+  //  CfgRegID8 = axi_lite_addr_t'(8'h58),
+ //   CfgRegID10 = axi_lite_addr_t'(8'h60)
   } llc_cfg_addr_e;
 
   ////////////////////////////////
@@ -326,7 +327,12 @@ module tb_axi_llc #(
   //  axi_lite_master.read(CfgRegID10,   lite_prot, lite_rdata, lite_resp);
 
     $info("Random read and write");
- 
+  /*  
+    lite_addr  = CfgSpm;
+    lite_wdata = axi_lite_data_t'({((TbSetAssociativity == 32'd1) ? 32'd1 : (TbSetAssociativity/2)){1'b1}});
+    lite_wstrb = axi_lite_strb_t'({TbAxiStrbWidthLite{1'b1}});
+    axi_lite_master.write(lite_addr, lite_prot, lite_wdata, lite_wstrb, lite_resp);
+ */	
     lite_addr  = CfgRegID0;
     lite_wdata = axi_lite_data_t'((TbSetAssociativity == 32'd1) ? 32'd1 : 32'h0000_4080);
     lite_wstrb = axi_lite_strb_t'({TbAxiStrbWidthLite{1'b1}});
@@ -336,7 +342,7 @@ module tb_axi_llc #(
     lite_wdata = axi_lite_data_t'((TbSetAssociativity == 32'd1) ? 32'd1 : 32'h2010_0090);
     lite_wstrb = axi_lite_strb_t'({TbAxiStrbWidthLite{1'b1}});
     axi_lite_master.write(lite_addr, lite_prot, lite_wdata, lite_wstrb, lite_resp);
- /*   
+  /*
     lite_addr  = CfgRegID8;
     lite_wdata = axi_lite_data_t'((TbSetAssociativity == 32'd1) ? 32'd1 : 32'h0030_0040);
     lite_wstrb = axi_lite_strb_t'({TbAxiStrbWidthLite{1'b1}});
@@ -347,12 +353,6 @@ module tb_axi_llc #(
     lite_wstrb = axi_lite_strb_t'({TbAxiStrbWidthLite{1'b1}});
     axi_lite_master.write(lite_addr, lite_prot, lite_wdata, lite_wstrb, lite_resp);
    */
-   
-    lite_addr  = CfgSpm;
-    lite_wdata = axi_lite_data_t'({((TbSetAssociativity == 32'd1) ? 32'd1 : (TbSetAssociativity/2)){1'b1}});
-    lite_wstrb = axi_lite_strb_t'({TbAxiStrbWidthLite{1'b1}});
-    axi_lite_master.write(lite_addr, lite_prot, lite_wdata, lite_wstrb, lite_resp);
-    
     axi_master.run(TbNumReads, TbNumWrites);
     flush_all(axi_lite_master);
     compare_mems(cpu_scoreboard, mem_scoreboard);
@@ -363,6 +363,17 @@ module tb_axi_llc #(
     lite_wdata = axi_lite_data_t'({((TbSetAssociativity == 32'd1) ? 32'd1 : (TbSetAssociativity/2)){1'b1}});
     lite_wstrb = axi_lite_strb_t'({TbAxiStrbWidthLite{1'b1}});
     axi_lite_master.write(lite_addr, lite_prot, lite_wdata, lite_wstrb, lite_resp);
+    
+    lite_addr  = CfgRegID0;
+    lite_wdata = axi_lite_data_t'((TbSetAssociativity == 32'd1) ? 32'd1 : 32'h0000_4080);
+    lite_wstrb = axi_lite_strb_t'({TbAxiStrbWidthLite{1'b1}});
+    axi_lite_master.write(lite_addr, lite_prot, lite_wdata, lite_wstrb, lite_resp);
+   
+    lite_addr  = CfgRegID4;
+    lite_wdata = axi_lite_data_t'((TbSetAssociativity == 32'd1) ? 32'd1 : 32'h2010_0090);
+    lite_wstrb = axi_lite_strb_t'({TbAxiStrbWidthLite{1'b1}});
+    axi_lite_master.write(lite_addr, lite_prot, lite_wdata, lite_wstrb, lite_resp);
+    
     axi_master.run(TbNumReads, TbNumWrites);
     flush_all(axi_lite_master);
     compare_mems(cpu_scoreboard, mem_scoreboard);
