@@ -88,7 +88,6 @@ module axi_llc_hit_miss #(
   input  cnt_t     cnt_down_i,
   // bist aoutput
   output way_ind_t bist_res_o,
-  output way_ind_t plru_bist_res_o,
   output logic     bist_valid_o
 );
   `include "common_cells/registers.svh"
@@ -368,8 +367,7 @@ module axi_llc_hit_miss #(
     .res_o        	( store_res          ),
     .valid_o      	( store_res_valid    ),
     .ready_i      	( store_res_ready    ),
-    .bist_res_o   	( bist_res_o         ),
-    .plru_bist_res_o   ( plru_bist_res_o    ),
+    .tbist_res_o   	( bist_res_o         ),
     .tbist_valid_o 	( bist_valid_o       )
   );
 

@@ -390,7 +390,7 @@ module axi_llc_top #(
   bitmask_ind_t id_bitmask;
 
   // BIST from tag_store
-  logic [Cfg.SetAssociativity-1:0] bist_res, plru_bist_res;
+  logic [Cfg.SetAssociativity-1:0] bist_res;
   logic                            bist_valid;
 
   // global flush signals
@@ -444,7 +444,6 @@ module axi_llc_top #(
     .flush_desc_recv_i ( flush_recv                             ),
     // BIST input
     .bist_res_i        ( bist_res                               ),
-    .plru_bist_res_i   ( plru_bist_res		          ),
     .bist_valid_i      ( bist_valid                             ),
     // address rules for bypass selection
     .axi_cached_rule_i ( cached_addr_rule                       ),
@@ -612,7 +611,6 @@ module axi_llc_top #(
     .r_unlock_gnt_o 	( r_unlock_gnt  ),
     .cnt_down_i     	( cnt_down      ),
     .bist_res_o     	( bist_res      ),
-    .plru_bist_res_o	( plru_bist_res ),
     .bist_valid_o   	( bist_valid    )
   );
 

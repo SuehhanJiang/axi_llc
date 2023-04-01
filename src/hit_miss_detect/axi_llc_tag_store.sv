@@ -54,11 +54,8 @@ module axi_llc_tag_store #(
   /// Hit miss unit is ready to accept response.
   input  logic       ready_i,
   /// BIST result output. If one of these bits is high, when `bist_valid_o` is `1`. The
-  /// corresponding tag storage SRAM macro failed the test.
-  output way_ind_t   bist_res_o,
-  /// PLRU BIST result output. If one of these bits is high, when `plru_bist_valid_o` is `1`. The
-  /// corresponding tag storage SRAM macro failed the test.
-  output way_ind_t   plru_bist_res_o,
+  /// corresponding tag storage/PLRU SRAM macro failed the test.
+  output way_ind_t   tbist_res_o,
   /// BIST output is valid.
   output logic       tbist_valid_o
 );
@@ -122,8 +119,9 @@ module axi_llc_tag_store #(
   // Response output into the spill register
   store_res_t res;
   logic       res_valid,   res_ready;
-  // Bist Valid Signal for PLRU and Tag Storage SRAMs
+  // Bist Signals for PLRU and Tag Storage SRAMs
   logic       bist_valid_o, plru_bist_valid_o;
+  way_ind_t   bist_res_o, plru_bist_res_o;
   
   
 
@@ -404,6 +402,7 @@ module axi_llc_tag_store #(
   assign plru_bist_valid_o = (req_q.mode == axi_llc_pkg::BIST) & plru_gen_eoc;
   // Assign Total Bist Valid output (For MBIST)
   assign tbist_valid_o = bist_valid_o & plru_bist_valid_o;
+  assign tbist_res_o = bist_res_o | plru_bist_res_o;
 
   onehot_to_bin #(
     .ONEHOT_WIDTH ( Cfg.SetAssociativity )
