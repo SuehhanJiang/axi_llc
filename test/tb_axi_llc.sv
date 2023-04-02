@@ -106,7 +106,7 @@ module tb_axi_llc #(
     NumBlocks     = axi_lite_addr_t'(8'h30),
     Version       = axi_lite_addr_t'(8'h38),
     CfgRegID0     = axi_lite_addr_t'(8'h40),
-    CfgRegID4     = axi_lite_addr_t'(8'h48)
+    CfgRegID4     = axi_lite_addr_t'(8'h44)
   //  CfgRegID8 = axi_lite_addr_t'(8'h58),
  //   CfgRegID10 = axi_lite_addr_t'(8'h60)
   } llc_cfg_addr_e;
