@@ -111,13 +111,13 @@ logic notComp;
 
 // TC_SRAM Instantiation 
 tc_sram #(
-      .NumWords    ( Cfg.NumLines ),
-      .DataWidth   ( plru_datalen ),
-      .ByteWidth   ( plru_datalen ),
-      .NumPorts    ( 32'd1        ),
-      .Latency     ( 32'd1	   ),
-      .SimInit     ( "none"       ),
-      .PrintSimCfg ( 1'b1         )
+      .NumWords    ( Cfg.NumLines 	            ),
+      .DataWidth   ( plru_datalen 		    ),
+      .ByteWidth   ( plru_datalen 		    ),
+      .NumPorts    ( 32'd1        		    ),
+      .Latency     ( axi_llc_pkg::TagMacroLatency ),
+      .SimInit     ( "none"       		    ),
+      .PrintSimCfg ( 1'b1        		    )
 ) i_plru_store (
       .clk_i   ( clk_i          ),
       .rst_ni  ( rst_ni         ),
