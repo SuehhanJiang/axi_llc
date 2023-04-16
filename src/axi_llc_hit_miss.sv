@@ -367,8 +367,8 @@ module axi_llc_hit_miss #(
     .res_o        	( store_res          ),
     .valid_o      	( store_res_valid    ),
     .ready_i      	( store_res_ready    ),
-    .tbist_res_o   	( bist_res_o         ),
-    .tbist_valid_o 	( bist_valid_o       )
+    .bist_res_o   	( bist_res_o         ),
+    .bist_valid_o 	( bist_valid_o       )
   );
 
   // inputs to the miss counter unit

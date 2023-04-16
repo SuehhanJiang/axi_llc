@@ -54,10 +54,10 @@ module axi_llc_tag_store #(
   /// Hit miss unit is ready to accept response.
   input  logic       ready_i,
   /// BIST result output. If one of these bits is high, when `bist_valid_o` is `1`. The
-  /// corresponding tag storage/PLRU SRAM macro failed the test.
-  output way_ind_t   tbist_res_o,
+  /// corresponding tag storage SRAM macro failed the test.
+  output way_ind_t   bist_res_o,
   /// BIST output is valid.
-  output logic       tbist_valid_o
+  output logic       bist_valid_o
 );
 
   // typedef, because we use in this module many signals with the width of SetAssiciativity
@@ -106,23 +106,19 @@ module axi_llc_tag_store #(
   // Binary representation of the selected output indicator
   bin_ind_t   bin_ind;
   // The pattern generation unit signals
-  logic       gen_valid,   gen_ready, plru_gen_ready;
+  logic       gen_valid,   gen_ready;
   index_t     gen_index;
   tag_data_t  gen_pattern, bist_pattern;
   logic       gen_req,     gen_we;
   way_ind_t   bist_res;
-  logic       bist_valid,  gen_eoc, plru_gen_eoc;
+  logic       bist_valid,  gen_eoc;
   // Evict box signals
   logic       evict_req,   evict_valid;
-  // PLRU Module Hit/BIST Detection Signals
-  logic       hit_req, hit_valid_s, bist_req;
+  // PLRU Module Hit Detection Signals
+  logic       hit_req, hit_valid_s;
   // Response output into the spill register
   store_res_t res;
   logic       res_valid,   res_ready;
-  // Bist Signals for PLRU and Tag Storage SRAMs
-  logic       bist_valid_o, plru_bist_valid_o;
-  way_ind_t   bist_res_o, plru_bist_res_o;
-  
   
 
   // macro control
@@ -144,8 +140,6 @@ module axi_llc_tag_store #(
     // PLRU Hit_inp/Ram_index_inp Initialization
     hit_inp     = way_ind_t'(0);
     ram_index_inp = index_t'(0);
-    // PLRU Module Bist Req Initialization
-    bist_req    = 1'b0;
     // generation request
     gen_valid    = 1'b0;
     bist_valid   = 1'b0;
@@ -162,10 +156,8 @@ module axi_llc_tag_store #(
             ram_wdata  = gen_pattern;
             bist_valid = |ram_rvalid;
             
-            // To Indicate Bist request to the PLRU Unit
-            bist_req   = 1;
             // If BIST finished, go to idle.
-            if (gen_eoc && plru_gen_eoc) begin
+            if (gen_eoc) begin
               switch_busy = 1'b1;
             end
           end
@@ -259,9 +251,9 @@ module axi_llc_tag_store #(
         unique case (req_i.mode)
           axi_llc_pkg::Bist: begin
             gen_valid   = 1'b1;
-            ready_o     = gen_ready & plru_gen_ready;
+            ready_o     = gen_ready;
             // Only switch the state, if the request is valid
-            switch_busy = gen_ready & plru_gen_ready;
+            switch_busy = gen_ready;
           end
           axi_llc_pkg::Lookup, axi_llc_pkg::Flush: begin
             // Do the lookup on the requested macros
@@ -380,7 +372,6 @@ module axi_llc_tag_store #(
     .rst_ni,
     .evict_i        ( evict_req     ),
     .hit_i	     ( hit_req	      ),
-    .bist_i         ( bist_req      ),
     .res_indicator  ( hit_inp       ),
     .tag_valid_i    ( tag_val       ),
     .tag_dirty_i    ( tag_dit       ),
@@ -389,20 +380,8 @@ module axi_llc_tag_store #(
     .way_ind_o      ( evict_way_ind ),
     .evict_o        ( evict_flag    ),
     .valid_o        ( evict_valid   ),
-    .valid_o_plru   ( hit_valid_s   ),
-    
-    // pins for BIST
-    .plru_gen_valid  ( gen_valid      ),
-    .plru_gen_ready  ( plru_gen_ready ),
-    .plru_bist_res_o ( plru_bist_res_o),
-    .plru_gen_eoc    ( plru_gen_eoc   )
+    .valid_o_plru   ( hit_valid_s   )
   );
-  
-  // Assign plru_bist_valid_o signal for Memory BIST Checking (PLRU ARRAY) 
-  assign plru_bist_valid_o = (req_q.mode == axi_llc_pkg::BIST) & plru_gen_eoc;
-  // Assign Total Bist Valid output (For MBIST)
-  assign tbist_valid_o = bist_valid_o & plru_bist_valid_o;
-  assign tbist_res_o = bist_res_o | plru_bist_res_o;
 
   onehot_to_bin #(
     .ONEHOT_WIDTH ( Cfg.SetAssociativity )

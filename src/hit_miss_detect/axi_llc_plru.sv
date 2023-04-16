@@ -38,8 +38,6 @@ module axi_llc_plru #(
     input logic evict_i,
     /// hit signal from the tag compare
     input logic hit_i,
-    /// Bist activated (signal)
-    input logic bist_i,
     /// Indicates which way the HIT Occured
     input way_ind_t   res_indicator,
     /// Way indicator for action to be performed. Is a onehot signal.
@@ -49,17 +47,7 @@ module axi_llc_plru #(
     /// Evict Flag signal
     output logic evict_o,
     /// Valid Hit after Updation
-    output logic valid_o_plru,
-    
-    /// INPUTS/OUTPUTS FOR BIST
-    /// BIST activation (from tag_store unit)
-    input logic plru_gen_valid,
-    /// BIST Ready for DATA 
-    output logic plru_gen_ready,
-    /// BIST result (reg)output (For Memory fault test) 
-    output way_ind_t plru_bist_res_o,
-    /// BIST End signal
-    output logic plru_gen_eoc
+    output logic valid_o_plru
 );
 
 `include "common_cells/registers.svh"
@@ -96,13 +84,6 @@ logic [31:0] thirtytwo_way_out_ind;
 // For Synchronous Write/Read from Memory
 logic ram_rvalid_d, ram_rvalid_q;
 
-// Signals for Memory BIST Operation    
-logic plru_gen_req, plru_gen_we;
-logic plru_bist_res_valid_i;
-line_addr plru_gen_index;
-data_plru plru_gen_pattern, plru_bist_pattern;
-way_ind_t plru_bist_res_i;
-
 //Occuiped ways in an index
 way_ind_t occupied;
 
@@ -116,7 +97,7 @@ axi_llc_tc_sram #(
       .ByteWidth   ( plru_datalen 		    ),
       .NumPorts    ( 32'd1        		    ),
       .Latency     ( axi_llc_pkg::TagMacroLatency ),
-      .SimInit     ( "none"       		    ),
+      .SimInit     ( "zeros"       		    ),
       .PrintSimCfg ( 1'b1        		    )
 ) i_plru_store (
       .clk_i   ( clk_i          ),
@@ -129,39 +110,6 @@ axi_llc_tc_sram #(
       .rdata_o ( plru_rdata     )
     );
     
-// Tag Pattern Generation for Memory BIST
-axi_llc_tag_pattern_gen #(
-    .Cfg       	( Cfg        		),
-    .pattern_t 	( data_plru 		),
-    .way_ind_t 	( way_ind_t  		),
-    .index_t   	( line_addr  		)
-  ) i_plru_pattern_gen (
-    .clk_i	          ( clk_i	        ),
-    .rst_ni	          ( rst_ni             ),
-    .valid_i          ( plru_gen_valid         ),
-    .ready_o          ( plru_gen_ready         ),
-    .index_o          ( plru_gen_index         ),
-    .pattern_o        ( plru_gen_pattern       ),
-    .req_o            ( plru_gen_req           ),
-    .we_o             ( plru_gen_we            ),
-    .bist_res_i       ( plru_bist_res_i        ),
-    .bist_res_valid_i ( plru_bist_res_valid_i  ),
-    .bist_res_o       ( plru_bist_res_o        ),
-    .eoc_o            ( plru_gen_eoc           )
-  );   
-    
-shift_reg #(
-    .dtype ( data_plru                   ),
-    .Depth ( axi_llc_pkg::TagMacroLatency )
-  ) i_shift_reg_bist_plru (
-    .clk_i,
-    .rst_ni,
-    .d_i    ( plru_gen_pattern  ),
-    .d_o    ( plru_bist_pattern )
-  );
-
-// XNOR Operation (Checking) for Memory BIST
-assign plru_bist_res_i = ((temp_ram) ~^ (plru_bist_pattern));
    
 // Memory Read/Write delay signals    
 assign ram_rvalid_d = (plru_request & ~plru_we) ? 1 : 0;    
@@ -549,9 +497,6 @@ endtask
         plru_line_addr = line_addr'(0);
         plru_wdata = data_plru'(0);
         plru_we = 1'b0;
-    
-        // PLRU BIST Result valid signal
-        plru_bist_res_valid_i = 0;
         
         //All Temp Ram initialization
         two_way_temp_ram = 1'b0;
@@ -569,18 +514,6 @@ endtask
         
         //Compatibility Checker
         notComp = 1'b0;
-    
-        if (bist_i) begin
-            //To initialize the SRAM to Zeros
-            plru_request    = {Cfg.SetAssociativity{plru_gen_req}};
-            plru_we         = {Cfg.SetAssociativity{plru_gen_we}};
-            plru_line_addr  = plru_gen_index;
-            plru_wdata      = plru_gen_pattern;
-            if (ram_rvalid_q) begin
-                temp_ram              = plru_rdata;
-                plru_bist_res_valid_i = 1;
-            end
-        end  
 
         if (hit_i && !valid_o_plru) begin 
             //we are a hit 
