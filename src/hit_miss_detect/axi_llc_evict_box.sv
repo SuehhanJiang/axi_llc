@@ -25,6 +25,8 @@ module axi_llc_evict_box #(
   input  logic evict_i,
   /// Request to Hit logic of PLRU Unit, has to be high to set the PLRU Bits in Hit.
   input logic hit_i,
+  ///
+  input logic bist_i,
   /// Res_indicator signal to determine the hit way inside the index
   input  way_ind_t   res_indicator,
   /// All valid tags as input. This indicates if there are still free ways for putting in data.
@@ -42,7 +44,17 @@ module axi_llc_evict_box #(
   /// Output is valid. This signal will eventually go to high if `evict_i` is 1.
   output logic valid_o,
   /// Valid Hit after Updation
-  output logic valid_o_plru
+  output logic valid_o_plru,
+  
+  /// Inputs/OUTPUTS for MEMORY BIST
+  /// BIST activation (from tag_store unit)
+  input logic plru_gen_valid,
+  /// BIST Ready for DATA
+  output logic plru_gen_ready,
+  /// BIST result (reg)output (For Memory fault test)
+  output way_ind_t plru_bist_res_o,
+  /// BIST End signal
+  output logic plru_gen_eoc
 );
 
   `include "common_cells/registers.svh"
@@ -62,11 +74,18 @@ module axi_llc_evict_box #(
       .tag_dirty_i    ( tag_dirty_i   ),
       .evict_i        ( evict_i       ),
       .hit_i          ( hit_i         ),
+      .bist_i         ( bist_i        ),
       .res_indicator  ( res_indicator ), 
       .out_way_ind    ( way_ind_o     ),
       .valid_o	       ( valid_o       ),
       .evict_o        ( evict_o       ),
-      .valid_o_plru   ( valid_o_plru  )
+      .valid_o_plru   ( valid_o_plru  ),
+      
+      // INPUTS/OUTPUTS FOR BIST OPERATIONS
+      .plru_gen_valid  ( plru_gen_valid  ),
+      .plru_gen_ready  ( plru_gen_ready  ),
+      .plru_bist_res_o ( plru_bist_res_o ),
+      .plru_gen_eoc    ( plru_gen_eoc    )
     );
        
   end else begin : gen_no_plru
@@ -76,6 +95,9 @@ module axi_llc_evict_box #(
       valid_o         = 0;
       evict_o         = 0;
       valid_o_plru    = 0;
+      plru_gen_ready  = 1;
+      plru_gen_eoc    = 1;
+      plru_bist_res_o = '0;
 
       if (evict_i) begin
         way_ind_o = 1'b1;
