@@ -110,7 +110,7 @@ way_ind_t occupied;
 logic notComp;
 
 // TC_SRAM Instantiation 
-axi_llc_tc_sram #(
+tc_sram #(
       .NumWords    ( Cfg.NumLines 	            ),
       .DataWidth   ( plru_datalen 		    ),
       .ByteWidth   ( plru_datalen 		    ),

@@ -45,3 +45,14 @@ vsim> run -all
 ```
 
 The simulation should complete after 53.168ms.
+
+
+### Force PLRU to BRAMs in FPGA Emulation (Workaround)
+
+To force PLRU SRAMs to be BRAMs (for FPGA Emulation), follow the steps mentioned below
+- include the "tc_sram_xilinx.sv" file from the following repository (https://github.com/pulp-platform/tech_cells_generic.git) into the hit_miss_detect folder
+- change the file name and module name to "axi_llc_tc_sram"
+- change MEMORY_PRIMITIVE parameter to "block"
+- change the "tc_sram" instantiation in the "axi_llc_plru" file to "axi_llc_tc_sram" 
+- update the .bender file to include the new "axi_llc_tc_sram" file (above "axi_llc_plru")
+
