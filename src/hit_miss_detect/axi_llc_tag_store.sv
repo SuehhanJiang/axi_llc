@@ -177,7 +177,7 @@ module axi_llc_tag_store #(
               	hit_req = 1'b1;
               	ram_index_inp = req_q.index;
               	hit_inp = hit;
-                res_valid = 1'b1;
+                res_valid = hit_valid_s;
               end else begin
                 evict_req = 1'b1;
                 ram_index_inp = req_q.index;
