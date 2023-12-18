@@ -6,6 +6,12 @@
 //Create a SRAM for the pseudo LRU Bits
 // register size -> (Cfg.SetAssociativity -1) * (`Cfg.NumLines)
 
+// Modification made by: Xuehan Jiang
+// Date of Modification: 2023-10-16
+// - Reduce working cycles in Hit case by advancing 'valid-o-plru' to read SRAM stage
+// - 'ram_rvalid_q' works as condition to maintain write SRAM process
+// Issue unsolved: 'ram_rvalid_q' not fully synchronized with the new timing, task write_tc_sram updating wrong data
+
 module axi_llc_plru #(
     
     /// Static LLC configuration struct 
@@ -535,42 +541,45 @@ endtask
     
     always_comb begin : axi_llc_all_way
     
-        if(!ram_rvalid_q) begin
-            // Outputs required for EVICTION
-            valid_o = 0; 
-            evict_o = 0;
-            out_way_ind = way_ind_t'(0);
-            // Outputs required for HIT Detection
-            valid_o_plru = 0;
-            // Temporary data storage from SRAM Unit
-            temp_ram = data_plru'(0);
         
-            // PLRU SRAM Request Signals                	
+        // Outputs required for EVICTION
+        valid_o = 0; 
+        evict_o = 0;
+        out_way_ind = way_ind_t'(0);
+        // Outputs required for HIT Detection
+        valid_o_plru = 0;
+        // Temporary data storage from SRAM Unit
+        temp_ram = data_plru'(0);
+    
+        // PLRU SRAM Request Signals
+        // ram_rvalid_q to keep write task going when valid-o-plru flagged to 1
+        if(!ram_rvalid_q) begin         	
             plru_request = 1'b0;
             plru_line_addr = line_addr'(0);
             plru_wdata = data_plru'(0);
             plru_we = 1'b0;
-        
-            // PLRU BIST Result valid signal
-            plru_bist_res_valid_i = 0;
-            
-            //All Temp Ram initialization
-            two_way_temp_ram = 1'b0;
-            four_way_temp_ram = 3'b0;
-            eight_way_temp_ram = 7'b0;
-            sixteen_way_temp_ram = 15'b0;
-            thirtytwo_way_temp_ram = 31'b0;
-            sixtyfour_way_temp_ram = 63'b0;
-
-            two_way_out_ind = 2'b0;
-            four_way_out_ind = 4'b0;
-            eight_way_out_ind = 8'b0;
-            sixteen_way_out_ind = 16'b0;
-            thirtytwo_way_out_ind = 32'b0;
-            
-            //Compatibility Checker
-            notComp = 1'b0;
         end
+    
+        // PLRU BIST Result valid signal
+        plru_bist_res_valid_i = 0;
+        
+        //All Temp Ram initialization
+        two_way_temp_ram = 1'b0;
+        four_way_temp_ram = 3'b0;
+        eight_way_temp_ram = 7'b0;
+        sixteen_way_temp_ram = 15'b0;
+        thirtytwo_way_temp_ram = 31'b0;
+        sixtyfour_way_temp_ram = 63'b0;
+
+        two_way_out_ind = 2'b0;
+        four_way_out_ind = 4'b0;
+        eight_way_out_ind = 8'b0;
+        sixteen_way_out_ind = 16'b0;
+        thirtytwo_way_out_ind = 32'b0;
+        
+        //Compatibility Checker
+        notComp = 1'b0;
+        
     
         if (bist_i) begin
             //To initialize the SRAM to Zeros
@@ -587,6 +596,8 @@ endtask
         if (hit_i && !valid_o_plru) begin 
             //we are a hit 
             read_tc_sram(ram_index);
+            // advance valid-o-plru by one cycle, controlling upper module 'axi_llc_tag_store' to start new lookup
+            valid_o_plru = 1;
             if (ram_rvalid_q) begin
                 temp_ram = plru_rdata; 
                 case (Cfg.SetAssociativity)                  
@@ -616,7 +627,7 @@ endtask
                     end
                     default : notComp = 1'b1;
                 endcase 
-                valid_o_plru = 1;  
+                //valid_o_plru = 1;  
             end
         end  
 
